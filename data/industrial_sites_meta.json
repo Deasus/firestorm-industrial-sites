@@ -1,0 +1,33 @@
+{
+  "generated_utc": "2026-07-02T18:32:32.428202Z",
+  "total_features": 10836,
+  "sources": [
+    {
+      "source": "epa_frs",
+      "generated": "2026-07-02T18:32:16.032265Z",
+      "count": 9621,
+      "naics_used": [
+        "324110",
+        "221112",
+        "331110",
+        "327310",
+        "562213"
+      ]
+    },
+    {
+      "source": "gvp_holocene",
+      "generated": "2026-07-02T18:32:18.361507Z",
+      "count": 1215
+    },
+    {
+      "source": "natural_earth_land_10m",
+      "file": "data/land_10m.geojson",
+      "available": true
+    }
+  ],
+  "consumer": "firestorm-firms-data/fetch_firms.py",
+  "buffer_defaults": {
+    "industrial": 500,
+    "volcano": 5000
+  }
+}
