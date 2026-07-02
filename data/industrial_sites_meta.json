@@ -1,10 +1,10 @@
 {
-  "generated_utc": "2026-07-02T19:31:20.710551Z",
-  "total_features": 11071,
+  "generated_utc": "2026-07-02T22:58:12.715507Z",
+  "total_features": 11133,
   "sources": [
     {
       "source": "epa_frs",
-      "generated": "2026-07-02T19:30:57.394967Z",
+      "generated": "2026-07-02T22:57:46.149282Z",
       "count": 9621,
       "naics_used": [
         "324110",
@@ -16,20 +16,21 @@
     },
     {
       "source": "gvp_holocene",
-      "generated": "2026-07-02T19:30:57.936011Z",
+      "generated": "2026-07-02T22:57:48.618277Z",
       "count": 1215
     },
     {
       "source": "gibs_nuclear",
-      "generated": "2026-07-02T19:30:58.624349Z",
+      "generated": "2026-07-02T22:57:49.102192Z",
       "count": 235
     },
     {
-      "source": "firms_persistent",
-      "generated": "2026-07-02T19:31:06.140625Z",
-      "count": 0,
-      "window_months": 12,
-      "months_fetched": 0
+      "source": "firms_self_mined_persistent",
+      "generated": "2026-07-02T22:57:49.196894Z",
+      "count": 62,
+      "lookback_days": 90,
+      "sampled_commits": 8,
+      "algorithm": "0.0040\u00b0 grid quantization + \u22656 distinct-day threshold"
     },
     {
       "source": "natural_earth_land_10m",
@@ -42,8 +43,6 @@
     "industrial": 500,
     "volcano": 5000,
     "nuclear": 500,
-    "volcano_firms": 2000,
-    "industrial_firms": 500,
-    "offshore_firms": 1000
+    "persistent_other": 500
   }
 }
