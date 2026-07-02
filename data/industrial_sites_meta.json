@@ -1,10 +1,10 @@
 {
-  "generated_utc": "2026-07-02T18:32:32.428202Z",
-  "total_features": 10836,
+  "generated_utc": "2026-07-02T19:31:20.710551Z",
+  "total_features": 11071,
   "sources": [
     {
       "source": "epa_frs",
-      "generated": "2026-07-02T18:32:16.032265Z",
+      "generated": "2026-07-02T19:30:57.394967Z",
       "count": 9621,
       "naics_used": [
         "324110",
@@ -16,8 +16,20 @@
     },
     {
       "source": "gvp_holocene",
-      "generated": "2026-07-02T18:32:18.361507Z",
+      "generated": "2026-07-02T19:30:57.936011Z",
       "count": 1215
+    },
+    {
+      "source": "gibs_nuclear",
+      "generated": "2026-07-02T19:30:58.624349Z",
+      "count": 235
+    },
+    {
+      "source": "firms_persistent",
+      "generated": "2026-07-02T19:31:06.140625Z",
+      "count": 0,
+      "window_months": 12,
+      "months_fetched": 0
     },
     {
       "source": "natural_earth_land_10m",
@@ -28,6 +40,10 @@
   "consumer": "firestorm-firms-data/fetch_firms.py",
   "buffer_defaults": {
     "industrial": 500,
-    "volcano": 5000
+    "volcano": 5000,
+    "nuclear": 500,
+    "volcano_firms": 2000,
+    "industrial_firms": 500,
+    "offshore_firms": 1000
   }
 }
