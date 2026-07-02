@@ -19,10 +19,13 @@ import json
 import os
 import sys
 from datetime import datetime, timezone
+from typing import Optional
 
-STAGE_FRS = os.path.join('data', '_stage_epa_frs.json')
-STAGE_GVP = os.path.join('data', '_stage_gvp.json')
-LAND_POLY = os.path.join('data', 'land_10m.geojson')   # existence check only
+STAGE_FRS   = os.path.join('data', '_stage_epa_frs.json')
+STAGE_GVP   = os.path.join('data', '_stage_gvp.json')
+STAGE_GIBS  = os.path.join('data', '_stage_gibs_nuclear.json')       # Path B
+STAGE_FIRMS = os.path.join('data', '_stage_firms_persistent.json')   # Path A
+LAND_POLY   = os.path.join('data', 'land_10m.geojson')   # existence check only
 
 OUT_GEOJSON = os.path.join('data', 'industrial_sites.geojson')
 OUT_MIN     = os.path.join('data', 'industrial_sites.min.geojson')
@@ -36,10 +39,16 @@ OUT_META    = os.path.join('data', 'industrial_sites_meta.json')
 DEFAULT_BUFFER_M = {
     'industrial': 500,
     'volcano':    5000,
+    'nuclear':    500,   # Path B: NASA GIBS SEDAC nuclear plants — reactor complex bounded ~500m
+    # Path A per-subtype: NASA's own persistent-source classification. Native
+    # VIIRS pixel 375m — matches spatial precision of the underlying detection.
+    'volcano_firms':    2000,   # tighter than GVP (2km vs 5km) — this is a per-DETECTION cluster centroid, not a summit
+    'industrial_firms': 500,
+    'offshore_firms':   1000,   # offshore sources are more diffuse (ship + platform + flare exclusion zone)
 }
 
 
-def _load(path: str) -> dict | None:
+def _load(path: str) -> Optional[dict]:
     if not os.path.exists(path):
         sys.stderr.write(f'[merge] MISSING {path}\n')
         return None
@@ -62,10 +71,12 @@ def _feat(lat: float, lng: float, props: dict) -> dict:
 def main() -> int:
     now_iso = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
-    frs = _load(STAGE_FRS)
-    gvp = _load(STAGE_GVP)
-    if not frs and not gvp:
-        sys.exit('[merge] FATAL: both source stages missing; nothing to merge')
+    frs    = _load(STAGE_FRS)
+    gvp    = _load(STAGE_GVP)
+    gibs   = _load(STAGE_GIBS)     # Path B: nuclear plants
+    firms  = _load(STAGE_FIRMS)    # Path A: NASA's own persistent-source clustering
+    if not frs and not gvp and not gibs and not firms:
+        sys.exit('[merge] FATAL: no source stages present; nothing to merge')
 
     features: list[dict] = []
     source_summary: list[dict] = []
@@ -113,6 +124,64 @@ def main() -> int:
             'count':     len(features) - n_before,
         })
         sys.stderr.write(f'[merge] +{len(features) - n_before} GVP volcanoes\n')
+
+    # ---- GIBS nuclear plants (Path B) ----
+    if gibs:
+        n_before = len(features)
+        for p in gibs.get('plants', []):
+            features.append(_feat(p['lat'], p['lng'], {
+                'source_id':   p['source_id'],
+                'source_type': 'nuclear_plant',
+                'class':       'nuclear',
+                'name':        p['name'],
+                'country':     p.get('country'),
+                'num_reactors': p.get('num_reactors'),
+                'buffer_m':    p.get('buffer_m', DEFAULT_BUFFER_M['nuclear']),
+                'provenance':  'NASA GIBS Nuclear_Power_Plant_Locations (SEDAC)',
+            }))
+        source_summary.append({
+            'source':    'gibs_nuclear',
+            'generated': gibs.get('generated_utc'),
+            'count':     len(features) - n_before,
+        })
+        sys.stderr.write(f'[merge] +{len(features) - n_before} GIBS nuclear plants\n')
+
+    # ---- FIRMS persistent-source clusters (Path A) ----
+    # NASA VNP14IMGML type-field-derived. Type 1=volcano_firms, 2=industrial_firms, 3=offshore_firms.
+    # These are the "precision" complement to EPA-FRS coverage: NASA's own
+    # detection algorithm has empirically observed these exact locations firing
+    # repeatedly. Catches unregistered sites (small industrial that EPA doesn't
+    # list, unclassified volcanoes, offshore platforms without regulatory footprint).
+    if firms:
+        n_before = len(features)
+        TYPE_TO_CLASS = {
+            1: ('volcano_firms',    'volcano_firms',    'NASA VNP14IMGML persistent volcano detection'),
+            2: ('industrial_firms', 'industrial_firms', 'NASA VNP14IMGML persistent static-industrial detection'),
+            3: ('offshore_firms',   'offshore_firms',   'NASA VNP14IMGML persistent offshore detection'),
+        }
+        for i, c in enumerate(firms.get('clusters', [])):
+            t = c.get('type')
+            if t not in TYPE_TO_CLASS:
+                continue
+            src_type, cls, prov = TYPE_TO_CLASS[t]
+            features.append(_feat(c['lat'], c['lng'], {
+                'source_id':   f'firms_persistent:{t}:{i}',
+                'source_type': src_type,
+                'class':       cls,
+                'name':        f'PERSISTENT SOURCE (T{t}, {c.get("n_detections",0)} detections / {c.get("n_months",0)} months)',
+                'n_detections': c.get('n_detections'),
+                'n_months':    c.get('n_months'),
+                'buffer_m':    DEFAULT_BUFFER_M.get(cls, 500),
+                'provenance':  prov,
+            }))
+        source_summary.append({
+            'source':      'firms_persistent',
+            'generated':   firms.get('generated_utc'),
+            'count':       len(features) - n_before,
+            'window_months': firms.get('window_months'),
+            'months_fetched': firms.get('months_fetched'),
+        })
+        sys.stderr.write(f'[merge] +{len(features) - n_before} FIRMS persistent-source clusters\n')
 
     # ---- Land polygon file existence check (not merged, just reported) ----
     land_ok = os.path.exists(LAND_POLY) and os.path.getsize(LAND_POLY) > 100_000

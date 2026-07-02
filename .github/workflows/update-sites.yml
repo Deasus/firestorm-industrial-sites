@@ -36,10 +36,10 @@ jobs:
 
       - name: Install runtime deps
         run: |
-          # ogr2ogr for the fastest shapefile->GeoJSON path; falls back to
-          # pyshp if GDAL install fails on the runner.
+          # ogr2ogr for the fastest shapefile->GeoJSON path
+          # sshpass so fetch_vnp14imgml.py can SFTP fuoco.geog.umd.edu (anon fire:burnt)
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends gdal-bin
+          sudo apt-get install -y --no-install-recommends gdal-bin sshpass
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
@@ -48,6 +48,19 @@ jobs:
 
       - name: Fetch Smithsonian GVP Holocene volcanoes
         run: python fetch_gvp.py
+
+      - name: Fetch NASA GIBS nuclear-plant locations (Path B)
+        run: python fetch_gibs_nuclear.py
+        continue-on-error: true
+
+      - name: Fetch NASA VNP14IMGML persistent-source archive (Path A)
+        # 12-month lookback via SFTP fuoco.geog.umd.edu. May take 5-15 min for
+        # first run downloading 12 monthly files (each ~10-30 MB gzipped).
+        # continue-on-error: even if UMD is temporarily unavailable we don't
+        # want to skip the rest of the pipeline — EPA + GVP + GIBS still ship.
+        run: python fetch_vnp14imgml.py
+        continue-on-error: true
+        timeout-minutes: 25
 
       - name: Fetch Natural Earth 10m land polygons
         run: python fetch_ne_land.py
