@@ -40,11 +40,11 @@ DEFAULT_BUFFER_M = {
     'industrial': 500,
     'volcano':    5000,
     'nuclear':    500,   # Path B: NASA GIBS SEDAC nuclear plants — reactor complex bounded ~500m
-    # Path A per-subtype: NASA's own persistent-source classification. Native
-    # VIIRS pixel 375m — matches spatial precision of the underlying detection.
-    'volcano_firms':    2000,   # tighter than GVP (2km vs 5km) — this is a per-DETECTION cluster centroid, not a summit
-    'industrial_firms': 500,
-    'offshore_firms':   1000,   # offshore sources are more diffuse (ship + platform + flare exclusion zone)
+    # Path A: self-mined persistent thermal sources (replaces the earlier
+    # VNP14IMGML approach). 500m matches VIIRS 375m native pixel + 125m
+    # geolocation error. Cluster centroid is already at 0.004° (~440m) grid
+    # resolution so we're tight.
+    'persistent_other': 500,
 }
 
 
@@ -146,42 +146,45 @@ def main() -> int:
         })
         sys.stderr.write(f'[merge] +{len(features) - n_before} GIBS nuclear plants\n')
 
-    # ---- FIRMS persistent-source clusters (Path A) ----
-    # NASA VNP14IMGML type-field-derived. Type 1=volcano_firms, 2=industrial_firms, 3=offshore_firms.
-    # These are the "precision" complement to EPA-FRS coverage: NASA's own
-    # detection algorithm has empirically observed these exact locations firing
-    # repeatedly. Catches unregistered sites (small industrial that EPA doesn't
-    # list, unclassified volcanoes, offshore platforms without regulatory footprint).
+    # ---- FIRMS self-mined persistent sources (Path A, redesigned) ----
+    # Replaces the earlier VNP14IMGML fetch: NASA doesn't publish a product
+    # by that name (verified 2026-07-02 via CMR zero-results search). UMD's
+    # Type field is a 90-day clustering result computed by them; we replicate
+    # the algorithm on our own FIRMS archive for a real-time equivalent.
+    #
+    # Emit as class='persistent_other' — a fourth deconfliction category
+    # (alongside industrial / volcano / nuclear) that captures thermal
+    # sources EPA/GVP/GIBS don't cover: illegal burn pits, off-grid flares,
+    # unregistered agricultural burn areas, small-industrial not in NAICS
+    # thermal codes, etc. Provenance says "self-mined" so operators know
+    # this is our derived layer, not an authoritative registry.
     if firms:
         n_before = len(features)
-        TYPE_TO_CLASS = {
-            1: ('volcano_firms',    'volcano_firms',    'NASA VNP14IMGML persistent volcano detection'),
-            2: ('industrial_firms', 'industrial_firms', 'NASA VNP14IMGML persistent static-industrial detection'),
-            3: ('offshore_firms',   'offshore_firms',   'NASA VNP14IMGML persistent offshore detection'),
-        }
         for i, c in enumerate(firms.get('clusters', [])):
-            t = c.get('type')
-            if t not in TYPE_TO_CLASS:
-                continue
-            src_type, cls, prov = TYPE_TO_CLASS[t]
             features.append(_feat(c['lat'], c['lng'], {
-                'source_id':   f'firms_persistent:{t}:{i}',
-                'source_type': src_type,
-                'class':       cls,
-                'name':        f'PERSISTENT SOURCE (T{t}, {c.get("n_detections",0)} detections / {c.get("n_months",0)} months)',
-                'n_detections': c.get('n_detections'),
-                'n_months':    c.get('n_months'),
-                'buffer_m':    DEFAULT_BUFFER_M.get(cls, 500),
-                'provenance':  prov,
+                'source_id':   f'firms_self_mined:{i}',
+                'source_type': 'persistent_other',
+                'class':       'persistent_other',
+                'name':        f'PERSISTENT THERMAL ({c.get("n_distinct_days",0)}d / {c.get("n_detections",0)} dets)',
+                'n_distinct_days': c.get('n_distinct_days'),
+                'n_detections':    c.get('n_detections'),
+                'first_seen':      c.get('first_seen'),
+                'last_seen':       c.get('last_seen'),
+                'mean_frp':        c.get('mean_frp'),
+                'buffer_m':    DEFAULT_BUFFER_M.get('persistent_other', 500),
+                'provenance':  f'FIRESTORM self-mine 90-day FIRMS archive '
+                               f'({firms.get("min_distinct_days","6")}-day distinct threshold, '
+                               f'{firms.get("grid_deg","0.004")}° grid)',
             }))
         source_summary.append({
-            'source':      'firms_persistent',
-            'generated':   firms.get('generated_utc'),
-            'count':       len(features) - n_before,
-            'window_months': firms.get('window_months'),
-            'months_fetched': firms.get('months_fetched'),
+            'source':          'firms_self_mined_persistent',
+            'generated':       firms.get('generated_utc'),
+            'count':           len(features) - n_before,
+            'lookback_days':   firms.get('lookback_days'),
+            'sampled_commits': firms.get('sampled_commits'),
+            'algorithm':       firms.get('algorithm'),
         })
-        sys.stderr.write(f'[merge] +{len(features) - n_before} FIRMS persistent-source clusters\n')
+        sys.stderr.write(f'[merge] +{len(features) - n_before} self-mined persistent-source clusters\n')
 
     # ---- Land polygon file existence check (not merged, just reported) ----
     land_ok = os.path.exists(LAND_POLY) and os.path.getsize(LAND_POLY) > 100_000

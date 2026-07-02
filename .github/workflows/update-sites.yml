@@ -37,9 +37,8 @@ jobs:
       - name: Install runtime deps
         run: |
           # ogr2ogr for the fastest shapefile->GeoJSON path
-          # sshpass so fetch_vnp14imgml.py can SFTP fuoco.geog.umd.edu (anon fire:burnt)
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends gdal-bin sshpass
+          sudo apt-get install -y --no-install-recommends gdal-bin
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
@@ -53,14 +52,18 @@ jobs:
         run: python fetch_gibs_nuclear.py
         continue-on-error: true
 
-      - name: Fetch NASA VNP14IMGML persistent-source archive (Path A)
-        # 12-month lookback via SFTP fuoco.geog.umd.edu. May take 5-15 min for
-        # first run downloading 12 monthly files (each ~10-30 MB gzipped).
-        # continue-on-error: even if UMD is temporarily unavailable we don't
-        # want to skip the rest of the pipeline — EPA + GVP + GIBS still ship.
-        run: python fetch_vnp14imgml.py
+      - name: Self-mine persistent thermal sources from our 90-day FIRMS archive (Path A)
+        # Replaces the earlier fetch_vnp14imgml.py attempt: VNP14IMGML is a
+        # UMD-local product, not an actual NASA-cataloged product (verified
+        # 2026-07-02 via CMR zero-results search). NASA's Type field is
+        # computed by UMD via 90-day clustering — we replicate the same
+        # algorithm on our own FIRMS archive to get real-time equivalent
+        # classification with no auth / no license / no 1-month lag.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python self_mine_persistent.py
         continue-on-error: true
-        timeout-minutes: 25
+        timeout-minutes: 10
 
       - name: Fetch Natural Earth 10m land polygons
         run: python fetch_ne_land.py
