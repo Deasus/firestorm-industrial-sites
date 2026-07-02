@@ -90,5 +90,19 @@ jobs:
             echo "no changes"
           else
             git commit -m "refresh industrial_sites — $(date -u +%Y-%m-%dT%H:%MZ)"
-            git push
+            # Race-safe push (same pattern as firestorm-firms-data):
+            # concurrent workflow_dispatch invocations can land between our
+            # checkout and our push. Data-file merge conflicts always resolve
+            # by taking OUR (newer) regeneration.
+            for attempt in 1 2 3 4; do
+              if git push 2>&1; then
+                echo "push succeeded on attempt $attempt"
+                exit 0
+              fi
+              echo "push attempt $attempt rejected — fetching + rebasing (ours-preferred)"
+              git fetch origin main
+              git rebase -X ours origin/main || { git rebase --abort; sleep 5; }
+            done
+            echo "::error::push failed after 4 attempts"
+            exit 1
           fi
