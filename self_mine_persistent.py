@@ -50,10 +50,14 @@ RAW_CONTENT_TMPL   = f'https://raw.githubusercontent.com/{FIRMS_REPO}/{{sha}}/{F
 # 90-day trailing window matches UMD's documented algorithm.
 LOOKBACK_DAYS = 90
 
-# Sample cadence — we want ~1 sample per day. firestorm-firms-data commits
-# roughly every 15 min (~96/day), so we sample every 96th commit for a
-# ~1/day cadence. 90 days × 1 sample = ~90 fetches total.
-COMMITS_PER_SAMPLE = 96
+# Sample cadence — we want ~1 sample per day. Cadence of the
+# firestorm-firms-data auto-commits varies (skipped if diff-empty, plus
+# workflow-fail gaps). Adaptive: divide total commits by lookback days to
+# infer real cadence, then step by that. First-run observation 2026-07-02:
+# 749 commits over 90 days = ~8/day (much lower than the 96/day 15-min
+# cron implies — many cycles produce no diff and skip commit).
+COMMITS_PER_SAMPLE_FLOOR = 1
+COMMITS_PER_SAMPLE_ENV   = os.environ.get('COMMITS_PER_SAMPLE')
 
 # Grid quantization at ~375m (VIIRS native pixel size at ~mid-latitude).
 # 0.005° ≈ 550m at equator; 375m ≈ 0.0034°. Using 0.004° for a slight
@@ -129,10 +133,16 @@ def sample_commit_shas() -> list[dict]:
         page += 1
     sys.stderr.write(f'[self_mine] found {len(all_shas)} commits in window (all pages walked)\n')
 
-    # Sample every COMMITS_PER_SAMPLE-th commit — including the newest
-    # (index 0) so we always cover "today's" data.
-    sampled = all_shas[::COMMITS_PER_SAMPLE]
-    sys.stderr.write(f'[self_mine] sampling {len(sampled)} of {len(all_shas)} commits (every {COMMITS_PER_SAMPLE}th)\n')
+    # Adaptive sampling: aim for ~1 sample per day of the lookback window.
+    # Env override wins for experimentation.
+    if COMMITS_PER_SAMPLE_ENV:
+        step = max(COMMITS_PER_SAMPLE_FLOOR, int(COMMITS_PER_SAMPLE_ENV))
+    else:
+        step = max(COMMITS_PER_SAMPLE_FLOOR, len(all_shas) // LOOKBACK_DAYS)
+    # Sample every step-th commit — including newest (index 0) so we always
+    # cover "today's" data.
+    sampled = all_shas[::step]
+    sys.stderr.write(f'[self_mine] sampling {len(sampled)} of {len(all_shas)} commits (every {step}th, adaptive from {LOOKBACK_DAYS}d target)\n')
     return sampled
 
 
