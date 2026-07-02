@@ -1,0 +1,78 @@
+name: update-industrial-sites
+
+# Weekly refresh of the merged industrial_sites.geojson. EPA FRS
+# refreshes ~monthly, Smithsonian GVP updates episodically, Natural
+# Earth is stable — weekly is defensive and cheap.
+#
+# Manual re-run via workflow_dispatch when a specific source has a
+# priority update (e.g. new eruption listed in GVP).
+
+on:
+  schedule:
+    - cron: '0 8 * * 0'   # Sundays 08:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: update-industrial-sites
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install runtime deps
+        run: |
+          # ogr2ogr for the fastest shapefile->GeoJSON path; falls back to
+          # pyshp if GDAL install fails on the runner.
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gdal-bin
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Fetch EPA FRS thermal-emitter facilities
+        run: python fetch_epa_frs.py
+
+      - name: Fetch Smithsonian GVP Holocene volcanoes
+        run: python fetch_gvp.py
+
+      - name: Fetch Natural Earth 10m land polygons
+        run: python fetch_ne_land.py
+
+      - name: Merge into industrial_sites.geojson
+        run: python build_industrial_sites.py
+
+      - name: Show build result
+        run: |
+          ls -lh data/
+          echo "--- meta ---"
+          cat data/industrial_sites_meta.json
+
+      - name: Commit if changed
+        run: |
+          git config user.name  "firestorm-industrial-sites-bot"
+          git config user.email "firestorm-industrial-sites-bot@users.noreply.github.com"
+          # Track only the versioned outputs — never the caches.
+          git add data/industrial_sites.geojson \
+                  data/industrial_sites.min.geojson \
+                  data/industrial_sites_meta.json \
+                  data/land_10m.geojson
+          if git diff --cached --quiet; then
+            echo "no changes"
+          else
+            git commit -m "refresh industrial_sites — $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          fi

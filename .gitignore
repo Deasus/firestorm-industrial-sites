@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.env.*
+
+# Cached bulk downloads — not tracked. Refreshed by CI.
+data/_cache_*.zip
+data/_stage_*.json
+data/_ne_ogr_tmp.geojson
