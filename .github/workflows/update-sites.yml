@@ -71,6 +71,22 @@ jobs:
       - name: Merge into industrial_sites.geojson
         run: python build_industrial_sites.py
 
+      - name: Build weekly FIRMS-validation digest (operator verdicts → NASA)
+        # Aggregates last 7 days of operator verdicts from the private
+        # firestorm-deconflict-feedback repo into a Markdown digest emailable
+        # to earthdata-support@nasa.gov + Louis Giglio (UMD) + Wilfrid
+        # Schroeder (NOAA NESDIS). Emitted to data/firms_digest_YYYYWWW.md
+        # + data/firms_digest_latest.md (stable path for humans to grab).
+        # Requires GITHUB_TOKEN with read access to firestorm-deconflict-feedback
+        # (auto-supplied on GHA, works because the workflow runs in the same
+        # org). continue-on-error: never let the digest step break the
+        # main sites pipeline.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python build_firms_digest.py
+        continue-on-error: true
+        timeout-minutes: 5
+
       - name: Show build result
         run: |
           ls -lh data/
@@ -85,7 +101,9 @@ jobs:
           git add data/industrial_sites.geojson \
                   data/industrial_sites.min.geojson \
                   data/industrial_sites_meta.json \
-                  data/land_10m.geojson
+                  data/land_10m.geojson \
+                  data/firms_digest_*.md 2>/dev/null || true
+          git add data/firms_digest_*.md 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "no changes"
           else
