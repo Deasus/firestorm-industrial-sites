@@ -1,11 +1,11 @@
 {
-  "generated_utc": "2026-09-06T12:06:05.606846Z",
-  "total_features": 14086,
+  "generated_utc": "2026-09-13T13:16:52.227004Z",
+  "total_features": 14209,
   "sources": [
     {
       "source": "epa_frs",
-      "generated": "2026-09-06T12:04:50.776784Z",
-      "count": 9691,
+      "generated": "2026-09-13T13:15:22.369389Z",
+      "count": 9755,
       "naics_used": [
         "324110",
         "221112",
@@ -16,18 +16,18 @@
     },
     {
       "source": "gvp_holocene",
-      "generated": "2026-09-06T12:04:51.850642Z",
+      "generated": "2026-09-13T13:15:26.643106Z",
       "count": 1214
     },
     {
       "source": "gibs_nuclear",
-      "generated": "2026-09-06T12:04:52.440612Z",
+      "generated": "2026-09-13T13:15:27.213091Z",
       "count": 235
     },
     {
       "source": "firms_self_mined_persistent",
-      "generated": "2026-09-06T12:04:52.533938Z",
-      "count": 2946,
+      "generated": "2026-09-13T13:15:27.307042Z",
+      "count": 3005,
       "lookback_days": 90,
       "sampled_commits": 91,
       "algorithm": "0.0040\u00b0 grid quantization + \u22656 distinct-day threshold"
