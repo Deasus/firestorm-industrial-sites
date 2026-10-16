@@ -1,6 +1,6 @@
 # FIRESTORM Operator Validation Digest
 
-**Window:** 2026-10-04T14:50:44Z → 2026-10-11T14:50:44Z
+**Window:** 2026-10-09T19:39:15Z → 2026-10-16T19:39:15Z
 **Total operator verdicts:** 0
 
 ## Provenance
