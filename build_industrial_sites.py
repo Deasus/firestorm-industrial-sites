@@ -25,6 +25,7 @@ STAGE_FRS   = os.path.join('data', '_stage_epa_frs.json')
 STAGE_GVP   = os.path.join('data', '_stage_gvp.json')
 STAGE_GIBS  = os.path.join('data', '_stage_gibs_nuclear.json')       # Path B
 STAGE_FIRMS = os.path.join('data', '_stage_firms_persistent.json')   # Path A
+STAGE_GLOBAL = os.path.join('data', '_stage_global_industrial.json')  # 2026-10-16: WRI GPPD + OSM, outside the US
 LAND_POLY   = os.path.join('data', 'land_10m.geojson')   # existence check only
 
 OUT_GEOJSON = os.path.join('data', 'industrial_sites.geojson')
@@ -75,6 +76,7 @@ def main() -> int:
     gvp    = _load(STAGE_GVP)
     gibs   = _load(STAGE_GIBS)     # Path B: nuclear plants
     firms  = _load(STAGE_FIRMS)    # Path A: NASA's own persistent-source clustering
+    glob   = _load(STAGE_GLOBAL)   # 2026-10-16: global industrial heat (power plants, flares, refineries, steel, cement)
     if not frs and not gvp and not gibs and not firms:
         sys.exit('[merge] FATAL: no source stages present; nothing to merge')
 
@@ -185,6 +187,29 @@ def main() -> int:
             'algorithm':       firms.get('algorithm'),
         })
         sys.stderr.write(f'[merge] +{len(features) - n_before} self-mined persistent-source clusters\n')
+
+    # ---- 2026-10-16: global industrial heat sources (FIRMS pipeline went global) ----
+    # class 'industrial' so detections near them get proximate_industrial exactly as
+    # EPA FRS sites do in the US; source_type keeps the finer kind (gas_flare,
+    # refinery, steelworks, cement, power_plant_<fuel>) for operator tooltips.
+    if glob:
+        n_before = len(features)
+        for site in glob.get('sites', []):
+            features.append(_feat(site['lat'], site['lng'], {
+                'source_id':   site['source_id'],
+                'source_type': site['source_type'],
+                'class':       'industrial',
+                'name':        site.get('name'),
+                'buffer_m':    site.get('buffer_m', DEFAULT_BUFFER_M['industrial']),
+                'provenance':  site.get('provenance'),
+            }))
+        source_summary.append({
+            'source':    'global_industrial',
+            'generated': glob.get('generated_utc'),
+            'count':     len(features) - n_before,
+            'detail':    glob.get('sources'),
+        })
+        sys.stderr.write(f'[merge] +{len(features) - n_before} global industrial heat sources\n')
 
     # ---- Land polygon file existence check (not merged, just reported) ----
     land_ok = os.path.exists(LAND_POLY) and os.path.getsize(LAND_POLY) > 100_000

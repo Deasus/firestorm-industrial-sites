@@ -8,3 +8,5 @@ __pycache__/
 data/_cache_*.zip
 data/_stage_*.json
 data/_ne_ogr_tmp.geojson
+# 2026-10-16: committed on purpose so a failed weekly OSM fetch carries the last good copy forward
+!data/_stage_global_industrial.json
